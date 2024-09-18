@@ -1,0 +1,29 @@
+#define DO_PIN 26  // ESP32's pin GPIO26 connected to DO pin of the MQ2 sensor
+#define AO_PIN 32
+
+int smokeValue = 0;
+int treshold = 1000;
+
+void setup() {
+  // initialize serial communication
+  Serial.begin(9600);
+  // initialize the ESP32's pin as an input
+  pinMode(DO_PIN, INPUT);
+
+  //Serial.println("Warming up the MQ2 sensor");
+  //delay(20000);  // wait for the MQ2 to warm up
+}
+
+void loop() {
+  int gasState = digitalRead(DO_PIN);
+
+  if (gasState != HIGH)
+    Serial.println("Gas Detected");
+
+  smokeValue = analogRead(AO_PIN);
+  Serial.println(smokeValue);
+  if(smokeValue > treshold){
+    Serial.println("Smoke Detected");
+  }
+  delay(1000);
+}

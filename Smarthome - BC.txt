@@ -1,0 +1,214 @@
+#define BLYNK_TEMPLATE_ID "TMPL6pUAiNpOi"
+#define BLYNK_TEMPLATE_NAME "Smart Home"
+#define BLYNK_AUTH_TOKEN "uhY1Cma3_6hFso6kWMFb_wokQ8Sk3CL3"
+#include "DHT.h"
+#define DHTPIN 14
+#define DHTTYPE DHT11
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>
+#include <ESP32Servo.h>
+
+// Your Wi-Fi credentials
+char ssid[] = "LABRPS";
+char pass[] = "Komputer0000";
+
+//Sensor Pin
+// Ultrasoonic HC-SR04
+const int trigPin = 13;
+const int echoPin = 12;
+
+// DH11
+DHT dht(DHTPIN, DHTTYPE);
+
+// Gas
+const int MQ2_PIN_DO = 26; // Pin sensor gas MQ-2 terhubung ke pin 26
+
+// Servo
+static const int servoPin = 27;
+
+Servo servo1;
+
+// Rain
+const int RAIN_SENSOR_PIN = 25;
+
+// Buzzer
+int BUZZER_PIN = 33; // deklarasi pin buzzer
+String SENSOR_NAME = "";
+int RAIN_ISACTIVE;
+int GAS_ISACTIVE;
+int SMOKE_ISACTIVE;
+
+// LED
+const int LED_PIN = 18;
+
+void checkWiFi() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi not connected, attempting to connect...");
+    WiFi.begin(ssid, pass);
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(1000);
+      Serial.print(".");
+    }
+    Serial.println("\nWiFi connected.");
+  }
+}
+
+void ultrasonic(){
+  // Variabel untuk menyimpan waktu perjalanan gelombang ultrasonik
+  long duration;
+  // Kirimkan sinyal ultrasonik
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  
+  // Baca waktu perjalanan gelombang
+  duration = pulseIn(echoPin, HIGH);
+  
+  // Hitung jarak berdasarkan waktu perjalanan
+  unsigned int distance = duration * 0.034 / 2;
+
+  // Kirim data jarak ke Blynk
+  Blynk.virtualWrite(V0, distance);  // Gunakan V0 sebagai widget display di aplikasi Blynk
+  if(distance>=10){
+    servo1.write(180);
+  }else{
+    servo1.write(0);
+  }
+  // Tampilkan jarak dalam centimeter
+  Serial.print("Jarak: ");
+  Serial.print(distance);
+  Serial.println(" cm");
+}
+void kelembapan(){
+
+  float humidity = dht.readHumidity();
+  float temperature = dht.readTemperature();
+
+  if (isnan(humidity) || isnan(temperature)) {
+    Serial.println("Gagal membaca sensor DHT11!");
+    return;
+  }
+
+  // Kirim data kelembapan dan suhu ke Blynk
+  Blynk.virtualWrite(V1, String(temperature, 1) + " %");  // Gunakan V1 sebagai widget display di aplikasi Blynk
+  Blynk.virtualWrite(V2, temperature);  // Gunakan V2 sebagai widget display di aplikasi Blynk
+
+  Serial.print("Kelembaban: ");
+  Serial.print(humidity);
+  Serial.print(" %\t");
+  Serial.print("Suhu: ");
+  Serial.print(temperature);
+  Serial.println(" °C");
+}
+void gas(){
+  int gasState = digitalRead(MQ2_PIN_DO);
+
+  if (gasState != HIGH){
+    Serial.println("Gas Detected");
+    SENSOR_NAME = "gas";
+  }else{
+    GAS_ISACTIVE = 0;
+  }
+}
+
+void hujan(){
+  delay(10);
+  int rain_state = digitalRead(RAIN_SENSOR_PIN);  // Membaca nilai dari sensor hujan
+  if (rain_state != HIGH) {  // Jika tidak ada hujan
+    Serial.println("Rain Detected.");
+    SENSOR_NAME = "rain";
+  }else{
+    RAIN_ISACTIVE = 0;
+  }
+}
+
+void buzzer(){
+  if(SENSOR_NAME == "rain"){
+    // Buzzer ON (LOW)
+    digitalWrite(BUZZER_PIN, LOW); // bunyikan buzzer
+    delay(250); // delay 250 milidetik
+
+    // Buzzer OFF (HIGH)
+    digitalWrite(BUZZER_PIN, HIGH); // matikan buzzer
+    delay(250); // delay 250 milidetik
+  }else if(SENSOR_NAME == "gas"){
+    digitalWrite(BUZZER_PIN, LOW); // bunyikan buzzer
+  }else if(SENSOR_NAME == "smoke"){
+    // Buzzer ON (LOW)
+    digitalWrite(BUZZER_PIN, LOW); // bunyikan buzzer
+    delay(1000); // delay 1 detik
+
+    // Buzzer OFF (HIGH)
+    digitalWrite(BUZZER_PIN, HIGH); // matikan buzzer
+    delay(1000); // delay 1 detik
+  }
+  else{
+    digitalWrite(BUZZER_PIN, HIGH); // matikan buzzer
+  }
+}
+void setup() {
+  // put your setup code here, to run once:
+  // Mulai komunikasi serial dengan kecepatan 9600 bps
+  Serial.begin(9600);
+
+  //LED
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, HIGH); // turn the LED off
+
+  // Ultrasonic
+  // Set pin trigPin sebagai output
+  pinMode(trigPin, OUTPUT);
+  // Set pin echoPin sebagai input
+  pinMode(echoPin, INPUT);
+
+  //DHT11
+  dht.begin();
+
+  //MQ2 Gas
+  pinMode(MQ2_PIN_DO, INPUT);
+
+  //Servo
+  servo1.attach(servoPin);
+
+  // Rain
+  pinMode(RAIN_SENSOR_PIN, INPUT);
+
+  // Buzzer
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, HIGH); //Matikan Buzzer
+
+  // Hubungkan ke Wi-Fi dan Blynk
+  checkWiFi();
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+  
+  Serial.println("Warming up the MQ2 sensor");
+  delay(10000);  // wait for the MQ2 to warm up
+  Serial.println("Device Ready");
+  digitalWrite(BUZZER_PIN, LOW); //Bunyikan Buzzer
+  delay(1000);
+}
+
+// Fungsi untuk mengontrol LED
+BLYNK_WRITE(V4)
+{
+  int ledState = param.asInt();
+  digitalWrite(LED_PIN, ledState);
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+  checkWiFi();
+  Blynk.run();
+  ultrasonic();
+  kelembapan();
+  gas();
+  hujan();
+  buzzer();
+  if(RAIN_ISACTIVE == 0 && GAS_ISACTIVE == 0){
+    SENSOR_NAME = "";
+  }
+  //delay(1000); // Tunggu 1 detik antara pembacaan
+}
