@@ -176,10 +176,10 @@ void handleServoPintu(){
   }else{
     servo2.write(0);
   }
-  server.send(200, "text/plain", servoPintuState ? "Terbuka" : "Tertutup");
+  server.send(200, "text/plain", servoPintuState ? "Pintu Terbuka" : "Pintu Tertutup");
 }
 void handleGetPintuStatus(){
-  String status = servoPintuState ? "Terbuka" : "Tertutup";
+  String status = servoPintuState ? "Pintu Terbuka" : "Pintu Tertutup";
   server.send(200, "application/json", "{\"servoPintuState\": \"" + status + "\"}");
 }
 // Handle LED toggle URL
@@ -245,15 +245,15 @@ void setup() {
 
   // Initialize web server
   server.on("/", handleRoot);
-  server.on("/jarak", ultrasonic);
+  // server.on("/jarak", ultrasonic);
   // server.on("/kelembapan", kelembapan);
   // server.on("/gas", gas);
   // server.on("/hujan", hujan);
   // server.on("/asap",smoke);
   // server.on("/toggle-led", handleLEDToggle);
   // server.on("/get-led-status", handleGetLEDStatus);
-  // server.on("/servoPintu",handleServoPintu);
-  // server.on("/servoPintu",handleGetPintuStatus);
+  server.on("/servoPintu",handleServoPintu);
+  server.on("/servoPintuStatus",handleGetPintuStatus);
   server.begin();
   Serial.println("HTTP server started");
   
@@ -267,8 +267,12 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   checkWiFi();
-  ultrasonic();
+  // Sensor
+  // ultrasonic();
+  handleServoPintu();
+  handleGetPintuStatus();
+
   // Handle client requests
   server.handleClient();
-  delay(1000); // Tunggu 1 detik antara pembacaan
+  //delay(1000); // Tunggu 1 detik antara pembacaan
 }
