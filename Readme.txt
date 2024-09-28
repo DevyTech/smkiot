@@ -25,7 +25,7 @@ Buzzer Pin 33
 
 MQ2 Pin 32
 
-Servo Pintu Pin 35
+Servo Pintu Pin 4
 
 LED Pin [15, 4, 18, 19, 21, 22]
 
