@@ -49,6 +49,7 @@ bool ledState = false;
 
 // Handle root URL
 void handleRoot() {
+  server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   String sensorState = "online";
   server.send(200, "text/html", sensorState);
 }
@@ -267,9 +268,7 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   checkWiFi();
-  // Sensor
-  // ultrasonic();
-
+  
   // Handle client requests
   server.handleClient();
   //delay(1000); // Tunggu 1 detik antara pembacaan
