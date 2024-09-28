@@ -31,7 +31,7 @@ const int SMOKE_PIN = 32;
 
 // Servo
 static const int servoGarasi = 27;
-static const int servoPintu = 35;
+static const int servoPintu = 4;
 
 Servo servo1,servo2;
 
@@ -49,6 +49,7 @@ bool ledState = false;
 
 // Handle root URL
 void handleRoot() {
+  server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   String sensorState = "online";
   server.send(200, "text/html", sensorState);
 }
@@ -171,16 +172,16 @@ void hujan(){
 // Handle Servo Pintu toggle URL
 void handleServoPintu(){
   servoPintuState = !servoPintuState;
-  if(servoPintuState){
-    servo2.write(90);
-  }else{
-    servo2.write(0);
-  }
+  servo2.write(servoPintuState ? 90 : 0);
   server.send(200, "text/plain", servoPintuState ? "Pintu Terbuka" : "Pintu Tertutup");
+  Serial.print("Servo :");
+  Serial.println(servoPintuState);
 }
 void handleGetPintuStatus(){
   String status = servoPintuState ? "Pintu Terbuka" : "Pintu Tertutup";
   server.send(200, "application/json", "{\"servoPintuState\": \"" + status + "\"}");
+  Serial.print("Status :");
+  Serial.println(status);
 }
 // Handle LED toggle URL
 void handleLEDToggle() {
@@ -267,11 +268,7 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   checkWiFi();
-  // Sensor
-  // ultrasonic();
-  handleServoPintu();
-  handleGetPintuStatus();
-
+  
   // Handle client requests
   server.handleClient();
   //delay(1000); // Tunggu 1 detik antara pembacaan
