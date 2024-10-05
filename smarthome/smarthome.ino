@@ -6,6 +6,7 @@
 #include <ESP32Servo.h>
 #include <WebServer.h>
 #include <ESPmDNS.h>
+#include <ArduinoJson.h>
 
 // Your Wi-Fi credentials
 char ssid[] = "LABRPS";

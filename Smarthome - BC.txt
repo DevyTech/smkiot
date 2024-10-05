@@ -1,17 +1,19 @@
-#define BLYNK_TEMPLATE_ID "TMPL6pUAiNpOi"
-#define BLYNK_TEMPLATE_NAME "Smart Home"
-#define BLYNK_AUTH_TOKEN "uhY1Cma3_6hFso6kWMFb_wokQ8Sk3CL3"
 #include "DHT.h"
 #define DHTPIN 14
 #define DHTTYPE DHT11
 #include <WiFi.h>
 #include <WiFiClient.h>
-#include <BlynkSimpleEsp32.h>
 #include <ESP32Servo.h>
+#include <WebServer.h>
+#include <ESPmDNS.h>
+#include <ArduinoJson.h>
 
 // Your Wi-Fi credentials
 char ssid[] = "LABRPS";
-char pass[] = "Komputer0000";
+char pass[] = "Komputer1111";
+
+// Create a web server object that listens for HTTP request on port 80
+WebServer server(80);
 
 //Sensor Pin
 // Ultrasoonic HC-SR04
@@ -24,23 +26,34 @@ DHT dht(DHTPIN, DHTTYPE);
 // Gas
 const int MQ2_PIN_DO = 26; // Pin sensor gas MQ-2 terhubung ke pin 26
 
-// Servo
-static const int servoPin = 27;
+// Smoke
 
-Servo servo1;
+const int SMOKE_PIN = 32;
+
+// Servo
+static const int servoGarasi = 27;
+static const int servoPintu = 4;
+
+Servo servo1,servo2;
+
+bool servoPintuState = false;
 
 // Rain
 const int RAIN_SENSOR_PIN = 25;
 
 // Buzzer
 int BUZZER_PIN = 33; // deklarasi pin buzzer
-String SENSOR_NAME = "";
-int RAIN_ISACTIVE;
-int GAS_ISACTIVE;
-int SMOKE_ISACTIVE;
 
 // LED
 const int LED_PIN = 18;
+bool ledState = false;
+
+// Handle root URL
+void handleRoot() {
+  server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  String sensorState = "online";
+  server.send(200, "text/html", sensorState);
+}
 
 void checkWiFi() {
   if (WiFi.status() != WL_CONNECTED) {
@@ -69,18 +82,22 @@ void ultrasonic(){
   
   // Hitung jarak berdasarkan waktu perjalanan
   unsigned int distance = duration * 0.034 / 2;
-
-  // Kirim data jarak ke Blynk
-  Blynk.virtualWrite(V0, distance);  // Gunakan V0 sebagai widget display di aplikasi Blynk
+  String servoVal;
   if(distance>=10){
-    servo1.write(180);
+    servo1.write(90);
+    servoVal = "Servo Tertutup";
   }else{
+    servoVal = "Servo Terbuka";
     servo1.write(0);
   }
+  // Kirim data jarak ke webserver
+  String jsonResponse = "{\"distance\": " + String(distance) + ", \"servo\": \"" + servoVal + "\"}";
+  server.send(200,"application/json",jsonResponse);
   // Tampilkan jarak dalam centimeter
   Serial.print("Jarak: ");
   Serial.print(distance);
-  Serial.println(" cm");
+  Serial.print(" cm | ");
+  Serial.println(servoVal);
 }
 void kelembapan(){
 
@@ -89,12 +106,11 @@ void kelembapan(){
 
   if (isnan(humidity) || isnan(temperature)) {
     Serial.println("Gagal membaca sensor DHT11!");
-    return;
   }
 
-  // Kirim data kelembapan dan suhu ke Blynk
-  Blynk.virtualWrite(V1, String(temperature, 1) + " %");  // Gunakan V1 sebagai widget display di aplikasi Blynk
-  Blynk.virtualWrite(V2, temperature);  // Gunakan V2 sebagai widget display di aplikasi Blynk
+  // Kirim data teperature dan kelembapan ke webserver
+  String kelembapan = "{\"temperature\": " + String(temperature) + ", \"humidity\": " + String(humidity) + "}";
+  server.send(200, "application/json", kelembapan);
 
   Serial.print("Kelembaban: ");
   Serial.print(humidity);
@@ -105,49 +121,96 @@ void kelembapan(){
 }
 void gas(){
   int gasState = digitalRead(MQ2_PIN_DO);
+  String gasVal;
 
   if (gasState != HIGH){
     Serial.println("Gas Detected");
-    SENSOR_NAME = "gas";
+    gasVal = "Gas Terdeteksi";
+    digitalWrite(BUZZER_PIN, LOW); // bunyikan buzzer
   }else{
-    GAS_ISACTIVE = 0;
+    gasVal = "Gas Tidak Terdeteksi";
+    digitalWrite(BUZZER_PIN, HIGH); // matikan buzzer
   }
+  server.send(200,"text/plain",gasVal);
 }
+
+void smoke(){
+  int smokeState = digitalRead(SMOKE_PIN);
+  String smokeVal;
+
+  if(smokeState != HIGH){
+    Serial.println("Smoke Detected");
+    smokeVal = "Asap Terdeteksi";
+    digitalWrite(BUZZER_PIN, LOW); // bunyikan buzzer
+  }else{
+    smokeVal = "Asap Tidak Terdeteksi";
+    digitalWrite(BUZZER_PIN, HIGH); // matikan buzzer
+  }
+  server.send(200,"text/plain",smokeVal);
+}
+
 
 void hujan(){
   delay(10);
   int rain_state = digitalRead(RAIN_SENSOR_PIN);  // Membaca nilai dari sensor hujan
+  String rainVal;
   if (rain_state != HIGH) {  // Jika tidak ada hujan
     Serial.println("Rain Detected.");
-    SENSOR_NAME = "rain";
+    rainVal = "Air Terdeteksi";
+    // Buzzer ON (LOW)
+    digitalWrite(BUZZER_PIN, LOW); // bunyikan buzzer
+    delay(250); // delay 250 milidetik
+
+    // Buzzer OFF (HIGH)
+    digitalWrite(BUZZER_PIN, HIGH); // matikan buzzer
+    delay(250); // delay 250 milidetik
   }else{
-    RAIN_ISACTIVE = 0;
+    rainVal = "Air Tidak Terdeteksi";
+    digitalWrite(BUZZER_PIN, HIGH); // matikan buzzer
   }
+  server.send(200,"text/plain",rainVal);
 }
+// Handle Servo Pintu toggle URL
+// void handlePintuRequest(const char* request) {
+//   // Periksa jenis permintaan
+//   if (request == "toggle") {
+//     servoPintuState = !servoPintuState;
+//     servo2.write(servoPintuState ? 90 : 0);
+//   }
+//   // Bentuk respons JSON
+//   String status = servoPintuState ? "Pintu Terbuka" : "Pintu Tertutup";
+//   DynamicJsonDocument doc(100);
+//   doc["servoPintuState"] = status;
 
-void buzzer(){
-  if(SENSOR_NAME == "rain"){
-    // Buzzer ON (LOW)
-    digitalWrite(BUZZER_PIN, LOW); // bunyikan buzzer
-    delay(250); // delay 250 milidetik
+//   // Kirim respons
+//   String json;
+//   serializeJson(doc, json);
+//   server.send(200, "application/json", json);
+// }
 
-    // Buzzer OFF (HIGH)
-    digitalWrite(BUZZER_PIN, HIGH); // matikan buzzer
-    delay(250); // delay 250 milidetik
-  }else if(SENSOR_NAME == "gas"){
-    digitalWrite(BUZZER_PIN, LOW); // bunyikan buzzer
-  }else if(SENSOR_NAME == "smoke"){
-    // Buzzer ON (LOW)
-    digitalWrite(BUZZER_PIN, LOW); // bunyikan buzzer
-    delay(1000); // delay 1 detik
-
-    // Buzzer OFF (HIGH)
-    digitalWrite(BUZZER_PIN, HIGH); // matikan buzzer
-    delay(1000); // delay 1 detik
-  }
-  else{
-    digitalWrite(BUZZER_PIN, HIGH); // matikan buzzer
-  }
+void handleServoPintu(){
+  servoPintuState = !servoPintuState;
+  servo2.write(servoPintuState ? 90 : 0);
+  server.send(200, "text/plain", servoPintuState ? "Pintu Terbuka" : "Pintu Tertutup");
+  Serial.print("Servo :");
+  Serial.println(servoPintuState);
+}
+void handleGetPintuStatus(){
+  String status = servoPintuState ? "Pintu Terbuka" : "Pintu Tertutup";
+  server.send(200, "application/json", "{\"servoPintuState\": \"" + status + "\"}");
+  Serial.print("Status :");
+  Serial.println(status);
+}
+// Handle LED toggle URL
+void handleLEDToggle() {
+  ledState = !ledState;
+  digitalWrite(18, ledState ? HIGH : LOW);
+  server.send(200, "text/plain", ledState ? "ON" : "OFF");
+}
+// Handle current LED status URL
+void handleGetLEDStatus() {
+  String status = ledState ? "ON" : "OFF";
+  server.send(200, "application/json", "{\"ledState\": \"" + status + "\"}");
 }
 void setup() {
   // put your setup code here, to run once:
@@ -156,7 +219,7 @@ void setup() {
 
   //LED
   pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, HIGH); // turn the LED off
+  digitalWrite(LED_PIN, LOW); // turn the LED off
 
   // Ultrasonic
   // Set pin trigPin sebagai output
@@ -170,8 +233,12 @@ void setup() {
   //MQ2 Gas
   pinMode(MQ2_PIN_DO, INPUT);
 
+  //MQ2 Smoke
+  pinMode(SMOKE_PIN, INPUT);
+
   //Servo
-  servo1.attach(servoPin);
+  servo1.attach(servoGarasi);
+  servo2.attach(servoPintu);
 
   // Rain
   pinMode(RAIN_SENSOR_PIN, INPUT);
@@ -180,35 +247,48 @@ void setup() {
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN, HIGH); //Matikan Buzzer
 
-  // Hubungkan ke Wi-Fi dan Blynk
+  // Hubungkan ke Wi-Fi dan Webserver
   checkWiFi();
-  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+  // Print the IP address
+  Serial.print("ESP32 IP Address: ");
+  Serial.println(WiFi.localIP());
+
+  // Initialize mDNS
+  if(!MDNS.begin("stmiot")){ // Set the hostname to "stmiot.local"
+    Serial.println("Error setting up MDNS responder!");
+    while(1){
+      delay(1000);
+    }
+  }
+  Serial.println("mDNS responder started");
+
+  // Initialize web server
+  server.on("/", handleRoot);
+  // server.on("/jarak", ultrasonic);
+  // server.on("/kelembapan", kelembapan);
+  // server.on("/gas", gas);
+  // server.on("/hujan", hujan);
+  // server.on("/asap",smoke);
+  // server.on("/toggle-led", handleLEDToggle);
+  // server.on("/get-led-status", handleGetLEDStatus);
+  server.on("/servoPintu",handleServoPintu);
+  server.on("/servoPintuStatus",handleGetPintuStatus);
+  // server.on("/servoPintu", handlePintuRequest);
+  server.begin();
+  Serial.println("HTTP server started");
   
   Serial.println("Warming up the MQ2 sensor");
   delay(10000);  // wait for the MQ2 to warm up
   Serial.println("Device Ready");
-  digitalWrite(BUZZER_PIN, LOW); //Bunyikan Buzzer
+  //digitalWrite(BUZZER_PIN, LOW); //Bunyikan Buzzer
   delay(1000);
-}
-
-// Fungsi untuk mengontrol LED
-BLYNK_WRITE(V4)
-{
-  int ledState = param.asInt();
-  digitalWrite(LED_PIN, ledState);
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   checkWiFi();
-  Blynk.run();
-  ultrasonic();
-  kelembapan();
-  gas();
-  hujan();
-  buzzer();
-  if(RAIN_ISACTIVE == 0 && GAS_ISACTIVE == 0){
-    SENSOR_NAME = "";
-  }
+  
+  // Handle client requests
+  server.handleClient();
   //delay(1000); // Tunggu 1 detik antara pembacaan
 }
