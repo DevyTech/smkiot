@@ -54,8 +54,8 @@ void startCamera() {
   config.pin_xclk = XCLK_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = FRAMESIZE_VGA; // Ubah ukuran sesuai kebutuhan (e.g., FRAMESIZE_QVGA, FRAMESIZE_SVGA)
-  config.jpeg_quality = 12; // Kualitas JPEG (nilai lebih kecil = kualitas lebih baik)
+  config.frame_size = FRAMESIZE_SVGA; // Ubah ukuran sesuai kebutuhan (e.g., FRAMESIZE_QVGA, FRAMESIZE_SVGA)
+  config.jpeg_quality = 4; // Kualitas JPEG (nilai lebih kecil = kualitas lebih baik)
   config.fb_count = 1;
 
   // Start camera

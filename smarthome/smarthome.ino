@@ -13,7 +13,7 @@ char ssid[] = "LABRPS";
 char pass[] = "Komputer1111";
 
 // Create a web server object that listens for HTTP request on port 80
-WebServer server(80);
+WebServer server(8080);
 
 //Sensor Pin
 // Ultrasoonic HC-SR04
@@ -257,7 +257,7 @@ void setup() {
   server.on("/servoPintu",handleServoPintu);
   server.on("/servoPintuStatus",handleGetPintuStatus);
   server.begin();
-  Serial.println("HTTP server started");
+  Serial.println("HTTP server started in Port 8080");
   
   Serial.println("Warming up the MQ2 sensor");
   delay(10000);  // wait for the MQ2 to warm up
