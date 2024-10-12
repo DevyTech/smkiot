@@ -13,7 +13,7 @@ char ssid[] = "LABRPS";
 char pass[] = "Komputer1111";
 
 // Create a web server object that listens for HTTP request on port 80
-WebServer server(80);
+WebServer server(8080);
 
 //Sensor Pin
 // Ultrasoonic HC-SR04
@@ -171,23 +171,6 @@ void hujan(){
   server.send(200,"text/plain",rainVal);
 }
 // Handle Servo Pintu toggle URL
-// void handlePintuRequest(const char* request) {
-//   // Periksa jenis permintaan
-//   if (request == "toggle") {
-//     servoPintuState = !servoPintuState;
-//     servo2.write(servoPintuState ? 90 : 0);
-//   }
-//   // Bentuk respons JSON
-//   String status = servoPintuState ? "Pintu Terbuka" : "Pintu Tertutup";
-//   DynamicJsonDocument doc(100);
-//   doc["servoPintuState"] = status;
-
-//   // Kirim respons
-//   String json;
-//   serializeJson(doc, json);
-//   server.send(200, "application/json", json);
-// }
-
 void handleServoPintu(){
   servoPintuState = !servoPintuState;
   servo2.write(servoPintuState ? 90 : 0);
@@ -269,13 +252,12 @@ void setup() {
   // server.on("/gas", gas);
   // server.on("/hujan", hujan);
   // server.on("/asap",smoke);
-  // server.on("/toggle-led", handleLEDToggle);
-  // server.on("/get-led-status", handleGetLEDStatus);
-  server.on("/servoPintu",handleServoPintu);
-  server.on("/servoPintuStatus",handleGetPintuStatus);
-  // server.on("/servoPintu", handlePintuRequest);
+  server.on("/toggle-led", handleLEDToggle);
+  server.on("/get-led-status", handleGetLEDStatus);
+  // server.on("/servoPintu",handleServoPintu);
+  // server.on("/servoPintuStatus",handleGetPintuStatus);
   server.begin();
-  Serial.println("HTTP server started");
+  Serial.println("HTTP server started in Port 8080");
   
   Serial.println("Warming up the MQ2 sensor");
   delay(10000);  // wait for the MQ2 to warm up

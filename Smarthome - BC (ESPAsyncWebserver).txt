@@ -33,7 +33,7 @@ const int SMOKE_PIN = 32;
 
 // Servo
 static const int servoGarasi = 27;
-static const int servoPintu = 34;
+static const int servoPintu = 4;
 
 Servo servo1,servo2;
 
@@ -182,8 +182,9 @@ void handleGetPintuStatus(AsyncWebServerRequest *request){
   Serial.println(status);
 }
 // Handle LED toggle URL
-void toggleLED(int pin, bool &state, AsyncWebServerRequest *request) {
+void handleLEDToggle(AsyncWebServerRequest *request, int pin, bool &state) {
   state = !state;
+  stateTeras = !stateTeras;
   digitalWrite(pin, state ? HIGH : LOW);
   String ledStatus = state ? "ON" : "OFF";
   request->send(200, "text/plain", ledStatus);
@@ -193,28 +194,9 @@ void toggleLED(int pin, bool &state, AsyncWebServerRequest *request) {
   Serial.println(ledStatus);
 }
 // Handle current LED status URL
-void handleLEDToggle(AsyncWebServerRequest *request) {
-  if (request->hasParam("led")){
-    String led = request->getParam("led")->value();
-    if(led=="teras"){
-      toggleLED(LED_TERAS, stateTeras, request);
-    }else if(led=="kamar"){
-      toggleLED(LED_KAMAR, stateKamar, request);
-    }else if(led=="dapur"){
-      toggleLED(LED_DAPUR, stateDapur, request);
-    }else{
-      request->send(400,"text/plain","Invalid LED");
-    }
-  }else{
-    request->send(400,"text/plain","No LED specified");
-  }
-}
 void handleGetLEDStatus(AsyncWebServerRequest *request) {
-  String statusTeras = stateTeras ? "ON" : "OFF";
-  String statusKamar = stateKamar ? "ON" : "OFF";
-  String statusDapur = stateDapur ? "ON" : "OFF";
-
-  request->send(200, "application/json", "{\"stateTeras\": \"" + statusTeras + "\", \"stateKamar\": \"" + statusKamar + "\", \"stateDapur\": \"" + statusDapur + "\"}");
+  String status = stateTeras ? "ON" : "OFF";
+  request->send(200, "application/json", "{\"stateTeras\": \"" + status + "\"}");
 }
 void setup() {
   // put your setup code here, to run once:
@@ -223,8 +205,11 @@ void setup() {
 
   //LED
   pinMode(LED_TERAS, OUTPUT);
+  digitalWrite(LED_TERAS, LOW); // turn the LED off
   pinMode(LED_KAMAR, OUTPUT);
+  digitalWrite(LED_KAMAR, LOW); // turn the LED off
   pinMode(LED_DAPUR, OUTPUT);
+  digitalWrite(LED_DAPUR, LOW); // turn the LED off
 
   // Ultrasonic
   // Set pin trigPin sebagai output
@@ -274,10 +259,10 @@ void setup() {
   // server.on("/gas", gas);
   // server.on("/hujan", hujan);
   // server.on("/asap",smoke);
-  server.on("/toggle-led",HTTP_GET, handleLEDToggle);
-  server.on("/get-led-status",HTTP_GET, handleGetLEDStatus);
-  // server.on("/servoPintu", HTTP_GET, handleServoPintu);
-  // server.on("/servoPintuStatus",HTTP_GET, handleGetPintuStatus);
+  // server.on("/toggle-led",HTTP_GET, handleLEDToggle);
+  // server.on("/get-led-status", handleGetLEDStatus);
+  server.on("/servoPintu", HTTP_GET, handleServoPintu);
+  server.on("/servoPintuStatus",HTTP_GET, handleGetPintuStatus);
   server.begin();
   Serial.println("HTTP server started in Port 8080");
   
@@ -285,10 +270,11 @@ void setup() {
   delay(10000);  // wait for the MQ2 to warm up
   Serial.println("Device Ready");
   //digitalWrite(BUZZER_PIN, LOW); //Bunyikan Buzzer
+  delay(1000);
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  checkWiFi();   
+  checkWiFi();
   //delay(1000); // Tunggu 1 detik antara pembacaan
 }
