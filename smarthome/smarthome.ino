@@ -33,7 +33,7 @@ const int SMOKE_PIN = 32;
 
 // Servo
 static const int servoGarasi = 27;
-static const int servoPintu = 34;
+static const int servoPintu = 34; //can use 34 or 35 pin
 
 Servo servo1,servo2;
 
