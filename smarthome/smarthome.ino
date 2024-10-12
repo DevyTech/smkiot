@@ -4,15 +4,17 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <ESP32Servo.h>
-#include <WebServer.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
+#include <ArduinoJson.h>
 
 // Your Wi-Fi credentials
 char ssid[] = "LABRPS";
 char pass[] = "Komputer1111";
 
 // Create a web server object that listens for HTTP request on port 80
-WebServer server(80);
+AsyncWebServer server(8080);
 
 //Sensor Pin
 // Ultrasoonic HC-SR04
@@ -31,7 +33,7 @@ const int SMOKE_PIN = 32;
 
 // Servo
 static const int servoGarasi = 27;
-static const int servoPintu = 4;
+static const int servoPintu = 34; //can use 34 or 35 pin
 
 Servo servo1,servo2;
 
@@ -44,14 +46,16 @@ const int RAIN_SENSOR_PIN = 25;
 int BUZZER_PIN = 33; // deklarasi pin buzzer
 
 // LED
-const int LED_PIN = 18;
-bool ledState = false;
+const int LED_TERAS = 15;
+const int LED_KAMAR = 4;
+const int LED_DAPUR = 18;
+bool stateTeras = false;
+bool stateKamar = false;
+bool stateDapur = false;
 
 // Handle root URL
-void handleRoot() {
-  server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-  String sensorState = "online";
-  server.send(200, "text/html", sensorState);
+void handleRoot(AsyncWebServerRequest *request) {
+  request->send(200, "text/html", "online");
 }
 
 void checkWiFi() {
@@ -66,7 +70,7 @@ void checkWiFi() {
   }
 }
 
-void ultrasonic(){
+void ultrasonic(AsyncWebServerRequest *request){
   // Variabel untuk menyimpan waktu perjalanan gelombang ultrasonik
   long duration;
   // Kirimkan sinyal ultrasonik
@@ -81,24 +85,18 @@ void ultrasonic(){
   
   // Hitung jarak berdasarkan waktu perjalanan
   unsigned int distance = duration * 0.034 / 2;
-  String servoVal;
-  if(distance>=10){
-    servo1.write(90);
-    servoVal = "Servo Tertutup";
-  }else{
-    servoVal = "Servo Terbuka";
-    servo1.write(0);
-  }
+  String servoVal = distance >= 10 ? "Servo Tertutup" : "Servo Terbuka";
+  servo1.write(distance >= 10 ? 90 : 0);
   // Kirim data jarak ke webserver
   String jsonResponse = "{\"distance\": " + String(distance) + ", \"servo\": \"" + servoVal + "\"}";
-  server.send(200,"application/json",jsonResponse);
+  request->send(200, "application/json", jsonResponse);
   // Tampilkan jarak dalam centimeter
   Serial.print("Jarak: ");
   Serial.print(distance);
   Serial.print(" cm | ");
   Serial.println(servoVal);
 }
-void kelembapan(){
+void kelembapan(AsyncWebServerRequest *request){
 
   float humidity = dht.readHumidity();
   float temperature = dht.readTemperature();
@@ -109,7 +107,7 @@ void kelembapan(){
 
   // Kirim data teperature dan kelembapan ke webserver
   String kelembapan = "{\"temperature\": " + String(temperature) + ", \"humidity\": " + String(humidity) + "}";
-  server.send(200, "application/json", kelembapan);
+  request->send(200, "application/json", kelembapan);
 
   Serial.print("Kelembaban: ");
   Serial.print(humidity);
@@ -118,7 +116,7 @@ void kelembapan(){
   Serial.print(temperature);
   Serial.println(" °C");
 }
-void gas(){
+void gas(AsyncWebServerRequest *request){
   int gasState = digitalRead(MQ2_PIN_DO);
   String gasVal;
 
@@ -130,10 +128,10 @@ void gas(){
     gasVal = "Gas Tidak Terdeteksi";
     digitalWrite(BUZZER_PIN, HIGH); // matikan buzzer
   }
-  server.send(200,"text/plain",gasVal);
+  request->send(200, "text/plain", gasVal);
 }
 
-void smoke(){
+void smoke(AsyncWebServerRequest *request){
   int smokeState = digitalRead(SMOKE_PIN);
   String smokeVal;
 
@@ -145,11 +143,11 @@ void smoke(){
     smokeVal = "Asap Tidak Terdeteksi";
     digitalWrite(BUZZER_PIN, HIGH); // matikan buzzer
   }
-  server.send(200,"text/plain",smokeVal);
+  request->send(200,"text/plain",smokeVal);
 }
 
 
-void hujan(){
+void hujan(AsyncWebServerRequest *request){
   delay(10);
   int rain_state = digitalRead(RAIN_SENSOR_PIN);  // Membaca nilai dari sensor hujan
   String rainVal;
@@ -167,32 +165,56 @@ void hujan(){
     rainVal = "Air Tidak Terdeteksi";
     digitalWrite(BUZZER_PIN, HIGH); // matikan buzzer
   }
-  server.send(200,"text/plain",rainVal);
+  request->send(200,"text/plain",rainVal);
 }
 // Handle Servo Pintu toggle URL
-void handleServoPintu(){
+void handleServoPintu(AsyncWebServerRequest *request){
   servoPintuState = !servoPintuState;
   servo2.write(servoPintuState ? 90 : 0);
-  server.send(200, "text/plain", servoPintuState ? "Pintu Terbuka" : "Pintu Tertutup");
+  request->send(200, "text/plain", servoPintuState ? "Pintu Terbuka" : "Pintu Tertutup");
   Serial.print("Servo :");
   Serial.println(servoPintuState);
 }
-void handleGetPintuStatus(){
+void handleGetPintuStatus(AsyncWebServerRequest *request){
   String status = servoPintuState ? "Pintu Terbuka" : "Pintu Tertutup";
-  server.send(200, "application/json", "{\"servoPintuState\": \"" + status + "\"}");
+  request->send(200, "application/json", "{\"servoPintuState\": \"" + status + "\"}");
   Serial.print("Status :");
   Serial.println(status);
 }
 // Handle LED toggle URL
-void handleLEDToggle() {
-  ledState = !ledState;
-  digitalWrite(18, ledState ? HIGH : LOW);
-  server.send(200, "text/plain", ledState ? "ON" : "OFF");
+void toggleLED(int pin, bool &state, AsyncWebServerRequest *request) {
+  state = !state;
+  digitalWrite(pin, state ? HIGH : LOW);
+  String ledStatus = state ? "ON" : "OFF";
+  request->send(200, "text/plain", ledStatus);
+  Serial.print("LED on pin ");
+  Serial.print(pin);
+  Serial.print(" is now ");
+  Serial.println(ledStatus);
 }
 // Handle current LED status URL
-void handleGetLEDStatus() {
-  String status = ledState ? "ON" : "OFF";
-  server.send(200, "application/json", "{\"ledState\": \"" + status + "\"}");
+void handleLEDToggle(AsyncWebServerRequest *request) {
+  if (request->hasParam("led")){
+    String led = request->getParam("led")->value();
+    if(led=="teras"){
+      toggleLED(LED_TERAS, stateTeras, request);
+    }else if(led=="kamar"){
+      toggleLED(LED_KAMAR, stateKamar, request);
+    }else if(led=="dapur"){
+      toggleLED(LED_DAPUR, stateDapur, request);
+    }else{
+      request->send(400,"text/plain","Invalid LED");
+    }
+  }else{
+    request->send(400,"text/plain","No LED specified");
+  }
+}
+void handleGetLEDStatus(AsyncWebServerRequest *request) {
+  String statusTeras = stateTeras ? "ON" : "OFF";
+  String statusKamar = stateKamar ? "ON" : "OFF";
+  String statusDapur = stateDapur ? "ON" : "OFF";
+
+  request->send(200, "application/json", "{\"stateTeras\": \"" + statusTeras + "\", \"stateKamar\": \"" + statusKamar + "\", \"stateDapur\": \"" + statusDapur + "\"}");
 }
 void setup() {
   // put your setup code here, to run once:
@@ -200,8 +222,9 @@ void setup() {
   Serial.begin(9600);
 
   //LED
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, LOW); // turn the LED off
+  pinMode(LED_TERAS, OUTPUT);
+  pinMode(LED_KAMAR, OUTPUT);
+  pinMode(LED_DAPUR, OUTPUT);
 
   // Ultrasonic
   // Set pin trigPin sebagai output
@@ -245,31 +268,27 @@ void setup() {
   Serial.println("mDNS responder started");
 
   // Initialize web server
-  server.on("/", handleRoot);
+  server.on("/",HTTP_GET, handleRoot);
   // server.on("/jarak", ultrasonic);
   // server.on("/kelembapan", kelembapan);
   // server.on("/gas", gas);
   // server.on("/hujan", hujan);
   // server.on("/asap",smoke);
-  // server.on("/toggle-led", handleLEDToggle);
-  // server.on("/get-led-status", handleGetLEDStatus);
-  server.on("/servoPintu",handleServoPintu);
-  server.on("/servoPintuStatus",handleGetPintuStatus);
+  server.on("/toggle-led",HTTP_GET, handleLEDToggle);
+  server.on("/get-led-status",HTTP_GET, handleGetLEDStatus);
+  // server.on("/servoPintu", HTTP_GET, handleServoPintu);
+  // server.on("/servoPintuStatus",HTTP_GET, handleGetPintuStatus);
   server.begin();
-  Serial.println("HTTP server started");
+  Serial.println("HTTP server started in Port 8080");
   
   Serial.println("Warming up the MQ2 sensor");
   delay(10000);  // wait for the MQ2 to warm up
   Serial.println("Device Ready");
   //digitalWrite(BUZZER_PIN, LOW); //Bunyikan Buzzer
-  delay(1000);
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  checkWiFi();
-  
-  // Handle client requests
-  server.handleClient();
+  checkWiFi();   
   //delay(1000); // Tunggu 1 detik antara pembacaan
 }

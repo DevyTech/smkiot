@@ -1,0 +1,83 @@
+unsigned long startTime;
+const unsigned long timeoutPeriod = 3000; // 5 detik timeout
+
+void handleStream() {
+  camera_fb_t * fb = NULL;
+  WiFiClient client = server.client();
+
+  startTime = millis(); // Atur waktu mulai
+
+  if (!client.connected()) {
+    return;
+  }
+
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-Type: multipart/x-mixed-replace; boundary=frame");
+  client.println();
+
+  while (client.connected()) {
+    if (millis() - startTime > timeoutPeriod) { // Cek timeout
+      Serial.println("Timeout terjadi, menutup koneksi.");
+      client.stop(); // Tutup koneksi jika timeout
+      return;
+    }
+
+    fb = esp_camera_fb_get();
+    if (!fb) {
+      Serial.println("Camera capture failed");
+      continue;
+    }
+
+    // Kirim boundary
+    client.println("--frame");
+    client.println("Content-Type: image/jpeg");
+    client.println("Content-Length: " + String(fb->len));
+    client.println();
+    client.write(fb->buf, fb->len);
+    client.println();
+    esp_camera_fb_return(fb);
+
+    delay(30); // Sesuaikan untuk FPS
+  }
+}
+
+......................................
+
+
+void handleStream() {
+  camera_fb_t * fb = NULL;
+  WiFiClient client = server.client();
+
+  if (!client.connected()) {
+  return;
+  }
+
+  // Kirim header HTTP untuk streaming video
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-Type: multipart/x-mixed-replace; boundary=frame");
+  client.println();
+
+  while (true) {
+    fb = esp_camera_fb_get();
+    if (!fb) {
+      Serial.println("Camera capture failed");
+      continue;
+    }
+
+    // Kirim boundary
+    client.println("--frame");
+    client.println("Content-Type: image/jpeg");
+    client.println("Content-Length: " + String(fb->len));
+    client.println();
+
+    // Kirim buffer gambar
+    client.write(fb->buf, fb->len);
+    client.println();
+
+    // Kembalikan frame buffer ke kamera
+    esp_camera_fb_return(fb);
+
+    // Berikan delay untuk mengatur FPS (frame per second)
+    delay(30); // Sesuaikan untuk mendapatkan FPS yang diinginkan
+  }
+}
