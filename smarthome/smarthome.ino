@@ -47,11 +47,17 @@ int BUZZER_PIN = 33; // deklarasi pin buzzer
 
 // LED
 const int LED_TERAS = 15;
-const int LED_KAMAR = 4;
-const int LED_DAPUR = 18;
+const int LED_TENGAH = 4;
+const int LED_KAMAR1 = 18;
+const int LED_KAMAR2 = 19;
+const int LED_DAPUR = 21;
+const int LED_GARASI = 22;
 bool stateTeras = false;
-bool stateKamar = false;
+bool stateTengah = false;
+bool stateKamar1 = false;
+bool stateKamar2 = false;
 bool stateDapur = false;
+bool stateGarasi = false;
 
 // Handle root URL
 void handleRoot(AsyncWebServerRequest *request) {
@@ -198,10 +204,16 @@ void handleLEDToggle(AsyncWebServerRequest *request) {
     String led = request->getParam("led")->value();
     if(led=="teras"){
       toggleLED(LED_TERAS, stateTeras, request);
-    }else if(led=="kamar"){
-      toggleLED(LED_KAMAR, stateKamar, request);
+    }else if(led=="tengah"){
+      toggleLED(LED_TENGAH, stateTengah, request);
+    }else if(led=="kamar1"){
+      toggleLED(LED_KAMAR1, stateKamar1, request);
+    }else if(led=="kamar2"){
+      toggleLED(LED_KAMAR2, stateKamar2, request);
     }else if(led=="dapur"){
       toggleLED(LED_DAPUR, stateDapur, request);
+    }else if(led=="garasi"){
+      toggleLED(LED_GARASI, stateGarasi, request);
     }else{
       request->send(400,"text/plain","Invalid LED");
     }
@@ -211,10 +223,13 @@ void handleLEDToggle(AsyncWebServerRequest *request) {
 }
 void handleGetLEDStatus(AsyncWebServerRequest *request) {
   String statusTeras = stateTeras ? "ON" : "OFF";
-  String statusKamar = stateKamar ? "ON" : "OFF";
+  String statusTengah = stateTengah ? "ON" : "OFF";
+  String statusKamar1 = stateKamar1 ? "ON" : "OFF";
+  String statusKamar2 = stateKamar2 ? "ON" : "OFF";
   String statusDapur = stateDapur ? "ON" : "OFF";
+  String statusGarasi = stateGarasi ? "ON" : "OFF";
 
-  request->send(200, "application/json", "{\"stateTeras\": \"" + statusTeras + "\", \"stateKamar\": \"" + statusKamar + "\", \"stateDapur\": \"" + statusDapur + "\"}");
+  request->send(200, "application/json", "{\"stateTeras\": \"" + statusTeras + "\", \"stateTengah\": \"" + statusTengah + "\", \"stateKamar1\": \"" + statusKamar1 + "\", \"stateKamar2\": \"" + statusKamar2 + "\", \"stateDapur\": \"" + statusDapur + "\", \"stateGarasi\": \"" + statusGarasi + "\"}");
 }
 void setup() {
   // put your setup code here, to run once:
@@ -223,8 +238,11 @@ void setup() {
 
   //LED
   pinMode(LED_TERAS, OUTPUT);
-  pinMode(LED_KAMAR, OUTPUT);
+  pinMode(LED_TENGAH, OUTPUT);
+  pinMode(LED_KAMAR1, OUTPUT);
+  pinMode(LED_KAMAR2, OUTPUT);
   pinMode(LED_DAPUR, OUTPUT);
+  pinMode(LED_GARASI, OUTPUT);
 
   // Ultrasonic
   // Set pin trigPin sebagai output
@@ -269,15 +287,15 @@ void setup() {
 
   // Initialize web server
   server.on("/",HTTP_GET, handleRoot);
-  // server.on("/jarak", ultrasonic);
-  // server.on("/kelembapan", kelembapan);
-  // server.on("/gas", gas);
-  // server.on("/hujan", hujan);
-  // server.on("/asap",smoke);
+  server.on("/jarak", ultrasonic);
+  server.on("/kelembapan", kelembapan);
+  server.on("/gas", gas);
+  server.on("/hujan", hujan);
+  server.on("/asap",smoke);
   server.on("/toggle-led",HTTP_GET, handleLEDToggle);
   server.on("/get-led-status",HTTP_GET, handleGetLEDStatus);
-  // server.on("/servoPintu", HTTP_GET, handleServoPintu);
-  // server.on("/servoPintuStatus",HTTP_GET, handleGetPintuStatus);
+  server.on("/servoPintu", HTTP_GET, handleServoPintu);
+  server.on("/servoPintuStatus",HTTP_GET, handleGetPintuStatus);
   server.begin();
   Serial.println("HTTP server started in Port 8080");
   
