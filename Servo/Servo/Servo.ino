@@ -1,5 +1,5 @@
 #include <ESP32Servo.h>
-#define servoPin 4
+#define servoPin 5
 
 // static const int servoPin = 27;
 
