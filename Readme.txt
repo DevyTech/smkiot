@@ -8,6 +8,7 @@ List Sensor
 7.LED - Done 3.3v
 8.(MQ2 Sensor) Smoke - Done 5v
 9.Servo Pintu - 5v
+10.Servo Jendela - 5v
 
 HC-SR04 Pin
 Triger = 13
@@ -25,7 +26,9 @@ Buzzer Pin 33
 
 MQ2 Pin 32
 
-Servo Pintu Pin 34/35
+Servo Pin Jendela Pin 5
+Servo Pintu Pin 34
+Servo Garasi Pin 27
 
 LED Pin [15, 4, 18, 19, 21, 22]
 
