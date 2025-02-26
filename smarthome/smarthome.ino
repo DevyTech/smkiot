@@ -33,11 +33,13 @@ const int SMOKE_PIN = 32;
 
 // Servo
 static const int servoGarasi = 27;
-static const int servoPintu = 34; //can use 34 or 35 pin
+static const int servoPintu = 34;
+static const int servoJendela = 5;
 
-Servo servo1,servo2;
+Servo servo1,servo2,servo3;
 
 bool servoPintuState = false;
+bool servoJendelaState = false;
 
 // Rain
 const int RAIN_SENSOR_PIN = 25;
@@ -178,13 +180,27 @@ void handleServoPintu(AsyncWebServerRequest *request){
   servoPintuState = !servoPintuState;
   servo2.write(servoPintuState ? 90 : 0);
   request->send(200, "text/plain", servoPintuState ? "Pintu Terbuka" : "Pintu Tertutup");
-  Serial.print("Servo :");
+  Serial.print("Servo Pintu:");
   Serial.println(servoPintuState);
 }
 void handleGetPintuStatus(AsyncWebServerRequest *request){
   String status = servoPintuState ? "Pintu Terbuka" : "Pintu Tertutup";
   request->send(200, "application/json", "{\"servoPintuState\": \"" + status + "\"}");
-  Serial.print("Status :");
+  Serial.print("Status Pintu:");
+  Serial.println(status);
+}
+// Handle Servo Jendela toggle URL
+void handleServoJendela(AsyncWebServerRequest *request){
+  servoJendelaState = !servoJendelaState;
+  servo3.write(servoJendelaState ? 90 : 0);
+  request->send(200, "text/plain", servoJendelaState ? "Jendela Terbuka" : "Jendela Tertutup");
+  Serial.print("Servo Jendela:");
+  Serial.println(servoJendelaState);
+}
+void handleGetJendelaStatus(AsyncWebServerRequest *request){
+  String status = servoJendelaState ? "Jendela Terbuka" : "Jendela Tertutup";
+  request->send(200, "application/json", "{\"servoJendelaState\": \"" + status + "\"}");
+  Serial.print("Status Jendela:");
   Serial.println(status);
 }
 // Handle LED toggle URL
@@ -262,6 +278,7 @@ void setup() {
   //Servo
   servo1.attach(servoGarasi);
   servo2.attach(servoPintu);
+  servo3.attach(servoJendela);
 
   // Rain
   pinMode(RAIN_SENSOR_PIN, INPUT);
@@ -296,6 +313,8 @@ void setup() {
   server.on("/get-led-status",HTTP_GET, handleGetLEDStatus);
   server.on("/servoPintu", HTTP_GET, handleServoPintu);
   server.on("/servoPintuStatus",HTTP_GET, handleGetPintuStatus);
+  server.on("/servoJendela", HTTP_GET, handleServoJendela);
+  server.on("/servoJendelaStatus",HTTP_GET, handleGetJendelaStatus);
   server.begin();
   Serial.println("HTTP server started in Port 8080");
   
